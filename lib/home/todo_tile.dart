@@ -1,9 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-// Pastikan path import ini sesuai dengan struktur folder kamu
+
 import '/../core/colors.dart';
 import '/../core/text_style.dart';
+import '/../core/notification_service.dart';
 import 'todo_model.dart';
 import 'todo_provider.dart';
 
@@ -17,37 +18,59 @@ class TodoTile extends StatefulWidget {
 }
 
 class _TodoTileState extends State<TodoTile> {
-  late Timer _timer;
+  Timer? _rebuildTimer; // untuk update UI
+  Timer? _notifyTimer; // untuk trigger notif sekali
+
+  bool _hasNotified = false;
 
   @override
   void initState() {
     super.initState();
 
-    // ⏱ Rebuild otomatis agar countdown realtime
-    _timer = Timer.periodic(
-      const Duration(seconds: 1), // update tiap 30 detik (hemat performa)
-          (_) {
-        if (mounted) setState(() {});
-      },
-    );
+    // 🔁 Rebuild UI tiap 1 detik (countdown realtime)
+    _rebuildTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+
+    _setupNotificationTrigger();
+  }
+
+  /// Setup timer agar notif muncul tepat saat waktu habis
+  void _setupNotificationTrigger() {
+    final now = DateTime.now();
+    final diff = widget.todo.date.difference(now);
+
+    // Kalau sudah lewat atau sudah selesai → tidak perlu notif
+    if (diff.isNegative || widget.todo.isDone) return;
+
+    _notifyTimer = Timer(diff, () async {
+      if (!_hasNotified && mounted) {
+        _hasNotified = true;
+
+        await NotificationService.showNow(
+          title: "Waktu Habis",
+          body: "Tugas '${widget.todo.title}' sudah selesai waktunya!",
+        );
+      }
+    });
   }
 
   @override
   void dispose() {
-    _timer.cancel();
+    _rebuildTimer?.cancel();
+    _notifyTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // --- LOGIKA HITUNG MUNDUR REALTIME ---
     final now = DateTime.now();
     final diff = widget.todo.date.difference(now);
 
     String timeText;
     Color timeColor;
 
-// 🔴 TELAT & BELUM SELESAI
+    // 🔴 TELAT & BELUM SELESAI
     if (diff.isNegative && !widget.todo.isDone) {
       final late = diff.abs();
 
@@ -63,20 +86,17 @@ class _TodoTileState extends State<TodoTile> {
 
       timeColor = Colors.red;
     }
-
-// 🟠 SELESAI TAPI TELAT
+    // 🟠 SELESAI TAPI TELAT
     else if (widget.todo.isDone && diff.isNegative) {
       timeText = "Selesai (Terlambat)";
       timeColor = Colors.orange;
     }
-
-// 🟢 SELESAI TEPAT WAKTU
+    // 🟢 SELESAI TEPAT WAKTU
     else if (widget.todo.isDone) {
       timeText = "Selesai";
       timeColor = Colors.green;
     }
-
-// ⏱ COUNTDOWN
+    // ⏱ COUNTDOWN
     else {
       if (diff.inSeconds < 60) {
         timeText = "Sisa ${diff.inSeconds} detik";
@@ -93,8 +113,6 @@ class _TodoTileState extends State<TodoTile> {
       }
     }
 
-    // ------------------------------------
-
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
@@ -105,7 +123,7 @@ class _TodoTileState extends State<TodoTile> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Checkbox (TIDAK BERUBAH)
+          // 1. Checkbox
           GestureDetector(
             onTap: () {
               context.read<TodoProvider>().toggleTodo(widget.todo.id);
@@ -129,12 +147,11 @@ class _TodoTileState extends State<TodoTile> {
 
           const SizedBox(width: 12),
 
-          // 2. Judul, Deskripsi & Waktu
+          // 2. Konten
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Title
                 Text(
                   widget.todo.title,
                   style: AppTextStyle.body.copyWith(
@@ -145,20 +162,14 @@ class _TodoTileState extends State<TodoTile> {
                 ),
                 const SizedBox(height: 4),
 
-                // Description
                 if (widget.todo.description.isNotEmpty) ...[
-                  Text(
-                    widget.todo.description,
-                    style: AppTextStyle.subtitle,
-                  ),
+                  Text(widget.todo.description, style: AppTextStyle.subtitle),
                   const SizedBox(height: 8),
                 ],
 
-                // Countdown / Terlambat
                 Row(
                   children: [
-                    Icon(Icons.access_time_rounded,
-                        size: 12, color: timeColor),
+                    Icon(Icons.access_time_rounded, size: 12, color: timeColor),
                     const SizedBox(width: 4),
                     Text(
                       timeText,
@@ -178,7 +189,7 @@ class _TodoTileState extends State<TodoTile> {
 
           const SizedBox(width: 8),
 
-          // 3. Priority Badge (TIDAK BERUBAH)
+          // 3. Priority Badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
@@ -192,7 +203,7 @@ class _TodoTileState extends State<TodoTile> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-          )
+          ),
         ],
       ),
     );

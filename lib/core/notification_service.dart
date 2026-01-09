@@ -4,7 +4,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notifications =
-  FlutterLocalNotificationsPlugin();
+      FlutterLocalNotificationsPlugin();
 
   static Future<void> init() async {
     tz.initializeTimeZones();
@@ -13,7 +13,9 @@ class NotificationService {
 
     // TRIK: Gunakan '@drawable/launch_background'
     // Icon ini PASTI ADA di semua project Flutter Android.
-    const androidInit = AndroidInitializationSettings('@drawable/launch_background');
+    const androidInit = AndroidInitializationSettings(
+      '@drawable/launch_background',
+    );
 
     const settings = InitializationSettings(android: androidInit);
 
@@ -63,9 +65,30 @@ class NotificationService {
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       // WAJIB: Gunakan wallClockTime agar akurat sesuai jam di layar HP
       uiLocalNotificationDateInterpretation:
-      UILocalNotificationDateInterpretation.wallClockTime,
+          UILocalNotificationDateInterpretation.wallClockTime,
     );
 
     print("JADWAL SUKSES: Notif ID $id akan muncul jam $scheduledDate");
+  }
+
+  static Future<void> showNow({
+    required String title,
+    required String body,
+  }) async {
+    const androidDetails = AndroidNotificationDetails(
+      'instant_channel',
+      'Instant Notification',
+      importance: Importance.max,
+      priority: Priority.high,
+    );
+
+    const details = NotificationDetails(android: androidDetails);
+
+    await _notifications.show(
+      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title,
+      body,
+      details,
+    );
   }
 }
