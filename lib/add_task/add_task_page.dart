@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
 import '../core/colors.dart';
 import '../core/text_style.dart';
-import '../core/notification_service.dart';
 import '../home/todo_model.dart';
 import '../home/todo_provider.dart';
 import 'priority_picker.dart';
+
+// ⬇️ GANTI ini sesuai nama halaman awal kamu
+import '../home/home_page.dart';
 
 class AddTaskPage extends StatefulWidget {
   const AddTaskPage({super.key});
@@ -21,27 +22,10 @@ class _AddTaskPageState extends State<AddTaskPage> {
   final titleController = TextEditingController();
   final descController = TextEditingController();
 
-  // Default waktu: 2 menit dari sekarang (buat testing cepat)
+  // Default waktu: 2 menit dari sekarang
   DateTime selectedDate = DateTime.now().add(const Duration(minutes: 2));
   int priority = 1;
 
-  @override
-  void initState() {
-    super.initState();
-    _requestNotificationPermission();
-  }
-
-  /// Minta izin notifikasi (Android 13+)
-  Future<void> _requestNotificationPermission() async {
-    final plugin = FlutterLocalNotificationsPlugin();
-    await plugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.requestNotificationsPermission();
-  }
-
-  /// Pilih tanggal & waktu
   Future<void> _pickDateTime() async {
     final pickedDate = await showDatePicker(
       context: context,
@@ -70,8 +54,8 @@ class _AddTaskPageState extends State<AddTaskPage> {
     });
   }
 
-  /// Simpan task + tampilkan notif sukses + kembali ke Home
-  Future<void> _saveTask() async {
+  /// 🔥 Simpan task lalu langsung kembali ke halaman awal
+  void _saveTask() {
     if (titleController.text.isEmpty) return;
 
     final todo = TodoModel(
@@ -85,29 +69,14 @@ class _AddTaskPageState extends State<AddTaskPage> {
     // 1️⃣ Simpan ke Provider
     context.read<TodoProvider>().addTodo(todo);
 
-    // 2️⃣ Notifikasi sukses langsung
-    await NotificationService.showNow(
-      title: "Berhasil",
-      body: "To-do '${todo.title}' berhasil ditambahkan",
+    if (!mounted) return;
+
+    // 2️⃣ LANGSUNG kembali ke halaman awal (tanpa notif)
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const HomePage()),
+      (route) => false,
     );
-
-    // 3️⃣ Jadwalkan notifikasi saat waktu habis
-    await NotificationService.scheduleNotification(
-      id: todo.hashCode.abs(),
-      title: "Waktu Habis!",
-      body: "Tugas '${todo.title}' sudah jatuh tempo.",
-      scheduledDate: selectedDate,
-    );
-
-    // 4️⃣ SnackBar feedback
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("To-do berhasil ditambahkan")),
-      );
-    }
-
-    // 5️⃣ Kembali ke halaman utama
-    if (mounted) Navigator.pop(context);
   }
 
   @override
